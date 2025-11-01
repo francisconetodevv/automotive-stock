@@ -10,9 +10,15 @@ namespace AutomotiveStock.Shared.Contracts
         public Guid EventId { get; set; }
         public DateTime DateTimeEntry { get; set; }
         public string DestinyPlant { get; set; }
-        public int MaterialCode { get; set; }
+        public string MaterialCode { get; set; }
         public double QtyReceived { get; set; }
         public string BatchNumberSupplier { get; set; }
+        
         public string? Invoce { get; set; }
+
+        public MaterialReplenishmentEvent()
+        {
+            EventId = Guid.NewGuid();
+        }
     }
 }
