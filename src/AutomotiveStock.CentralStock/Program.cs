@@ -1,12 +1,11 @@
-﻿using AutomotiveStock.Shared.Contracts;
+﻿using AutomotiveStock.CentralStock.Consumers;     // 1. Importar o Consumidor
+using AutomotiveStock.CentralStock.Data;
+using AutomotiveStock.CentralStock.Data.Repositories; // 2. Importar o Repositório
 using AutomotiveStock.Shared.Services;
-using System.Text.Json;
-using Serilog;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using AutomotiveStock.CentralStock.Data; // <--- MUDANÇA: Importar nosso DbContext
-using Microsoft.EntityFrameworkCore;    // <--- MUDANÇA: Importar EF Core
+using Serilog;
 
-// 1. Configurar Logger (Está perfeito)
 Log.Logger = new LoggerConfiguration()
         .MinimumLevel.Information()
         .Enrich.FromLogContext()
@@ -14,81 +13,49 @@ Log.Logger = new LoggerConfiguration()
         .WriteTo.File("logs/central_stock_.txt", rollingInterval: RollingInterval.Day, outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
         .CreateLogger();
 
-RabbitMQServices rabbitMQServices = null; // <--- MUDANÇA: Declarar fora para o 'finally' ter acesso
+RabbitMQServices rabbitMQServices = null;
 
 try
 {
     Log.Information("--- Sistema Central de Estoque INICIADO ---");
 
-    // 2. Configurar o Banco de Dados (DEVE VIR PRIMEIRO)
+    // --- 2. CONFIGURAR BANCO DE DADOS ---
     var configuration = new ConfigurationBuilder()
-        .SetBasePath(AppContext.BaseDirectory) // Garante que ele ache o appsettings.json
+        .SetBasePath(AppContext.BaseDirectory)
         .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
         .Build();
 
     var connectionString = configuration.GetConnectionString("DefaultConnection");
-
     if (string.IsNullOrEmpty(connectionString))
     {
-        Log.Fatal("A string de conexão 'DefaultConnection' não foi encontrada no appsettings.json");
-        return; // Encerra a aplicação se não houver banco
+        Log.Fatal("A string de conexão 'DefaultConnection' não foi encontrada.");
+        return; 
     }
+    Log.Information("Configuração do Banco de Dados carregada.");
 
-    Log.Information("Configuração do Banco de Dados carregada com sucesso.");
-
-    // <--- MUDANÇA: Guardar as opções do DbContext para usar no futuro
-    // Precisamos disso para que o callback do RabbitMQ possa criar instâncias do DbContext
     var dbContextOptions = new DbContextOptionsBuilder<CentralStockDbContext>()
         .UseSqlServer(connectionString)
         .Options;
 
+    // --- 3. CRIAR E INICIAR SERVIÇOS ---
 
-    // 3. Configurar o Consumidor RabbitMQ
-    Log.Information("Iniciando consumidor RabbitMQ...");
-    Log.Information("Aguardando eventos...");
-    Log.Information("----------------------------------------------");
+    // 3a. Criar o Repositório
+    IStockRepository stockRepository = new StockRepository(dbContextOptions);
+    
+    // 3b. Popular o banco (só vai rodar se estiver vazio)
+    stockRepository.InitializeDatabaseSeed();
+    Log.Information("Repositório e Banco de dados inicializados.");
 
-    rabbitMQServices = new RabbitMQServices("localhost"); // <--- MUDANÇA: Inicializar a variável
+    // 3c. Criar o Serviço de Mensageria
+    rabbitMQServices = new RabbitMQServices("localhost");
 
-    Action<string> handleConsumptionEvent = (message) =>
-    {
-        try
-        {
-            var consumptionEvent = JsonSerializer.Deserialize<MaterialConsumptionEvent>(message);
+    // 3d. Criar o Serviço Consumidor (injetando suas dependências)
+    var consumerService = new StockEventConsumer(rabbitMQServices, stockRepository);
 
-            if (consumptionEvent != null)
-            {
-                Log.Information(
-                    "Evento Recebido: Planta {Plant} | Material {MaterialCode} | Qty {Quantity} | Ordem {Order}",
-                    consumptionEvent.PlantConsumption,
-                    consumptionEvent.MaterialCode,
-                    consumptionEvent.QtyConsumed,
-                    consumptionEvent.ProductionOrder
-                );
-                
-                // <--- MUDANÇA: LÓGICA FUTURA
-                // No próximo passo, é AQUI que vamos usar o 'dbContextOptions' para
-                // criar um 'using (var db = new CentralStockDbContext(dbContextOptions))'
-                // e atualizar o banco de dados.
-            }
-        }
-        catch (JsonException jsonEx)
-        {
-            Log.Error(jsonEx, "Falha ao desserializar a mensagem: {MessageBody}", message);
-        }
-        catch (Exception ex)
-        {
-            Log.Error(ex, "Erro desconhecido ao processar evento.");
-        }
-    };
+    // 3e. Iniciar o Consumidor (que vai rodar em background)
+    consumerService.StartListening();
 
-    string queueName = "queue.central.stock";
-    string routingKey = "consumption.*";
-
-    // 4. Iniciamos o "Ouvinte"
-    rabbitMQServices.StartConsuming(queueName, routingKey, handleConsumptionEvent);
-
-    // 5. Manter o Console app rodando (APENAS UM READLINE NO FINAL)
+    // --- 4. MANTER A APLICAÇÃO VIVA ---
     Console.WriteLine("Pressione [Enter] para sair.");
     Console.ReadLine();
 }
@@ -99,8 +66,6 @@ catch (Exception ex)
 finally
 {
     Log.Information("--- Sistema Central de Estoque ENCERRANDO ---");
-
-    // 6. Limpar (Dispose) na ordem correta
-    rabbitMQServices?.DisposeConsumer(); // O '?' checa se é nulo antes de chamar
+    rabbitMQServices?.DisposeConsumer();
     Log.CloseAndFlush();
 }
