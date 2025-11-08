@@ -3,6 +3,7 @@ using AutomotiveStock.CentralStock.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -10,9 +11,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace AutomotiveStock.CentralStock.Migrations
 {
     [DbContext(typeof(CentralStockDbContext))]
-    partial class CentralStockDbContextModelSnapshot : ModelSnapshot
+    [Migration("20251108162200_Add_AlertSent_To_Material")]
+    partial class Add_AlertSent_To_Material
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder

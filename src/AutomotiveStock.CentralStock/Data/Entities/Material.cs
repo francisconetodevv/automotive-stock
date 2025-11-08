@@ -15,7 +15,9 @@ namespace AutomotiveStock.CentralStock.Data.Entities
         public int MinimumStock { get; set; }
         public string Class { get; set; }
         public string Supplier { get; set; }
-
         public double CurrentStock { get; set; }
+
+        public bool AlertSent { get; set; }
+        
     }
 }

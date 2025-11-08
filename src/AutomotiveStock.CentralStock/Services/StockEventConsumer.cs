@@ -48,7 +48,6 @@ namespace AutomotiveStock.CentralStock.Consumers
                         consumptionEvent.QtyConsumed
                     );
 
-                    // 5. CHAMA O REPOSITÓRIO (Cumprindo o RF02)
                     _stockRepository.UpdateStockFromConsumption(
                         consumptionEvent.MaterialCode, 
                         consumptionEvent.QtyConsumed

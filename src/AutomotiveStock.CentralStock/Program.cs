@@ -38,16 +38,15 @@ try
         .Options;
 
     // --- 3. CRIAR E INICIAR SERVIÇOS ---
+    // 3a. Criar o Serviço de Mensageria
+    rabbitMQServices = new RabbitMQServices("localhost");
 
-    // 3a. Criar o Repositório
-    IStockRepository stockRepository = new StockRepository(dbContextOptions);
+    // 3b. Criar o Repositório
+    IStockRepository stockRepository = new StockRepository(dbContextOptions, rabbitMQServices);
     
-    // 3b. Popular o banco (só vai rodar se estiver vazio)
+    // 3c. Popular o banco (só vai rodar se estiver vazio)
     stockRepository.InitializeDatabaseSeed();
     Log.Information("Repositório e Banco de dados inicializados.");
-
-    // 3c. Criar o Serviço de Mensageria
-    rabbitMQServices = new RabbitMQServices("localhost");
 
     // 3d. Criar o Serviço Consumidor (injetando suas dependências)
     var consumerService = new StockEventConsumer(rabbitMQServices, stockRepository);

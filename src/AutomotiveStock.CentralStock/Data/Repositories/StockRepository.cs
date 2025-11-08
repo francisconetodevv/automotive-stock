@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using AutomotiveStock.CentralStock.Data.Entities;
+using AutomotiveStock.Shared.Contracts;
+using AutomotiveStock.Shared.Services;
 using Microsoft.EntityFrameworkCore;
 using Serilog;
 
@@ -10,12 +12,13 @@ namespace AutomotiveStock.CentralStock.Data.Repositories
 {
     public class StockRepository : IStockRepository
     {
-
+        private readonly RabbitMQServices _rabbitMQServices;
         private readonly DbContextOptions<CentralStockDbContext> _dbContext;
 
-        public StockRepository(DbContextOptions<CentralStockDbContext> dbContextOptions)
+        public StockRepository(DbContextOptions<CentralStockDbContext> dbContextOptions, RabbitMQServices rabbitMQServices)
         {
             _dbContext = dbContextOptions;
+            _rabbitMQServices = rabbitMQServices;
         }
 
         public void InitializeDatabaseSeed()
@@ -107,6 +110,23 @@ namespace AutomotiveStock.CentralStock.Data.Repositories
                 {
                     double oldStock = material.CurrentStock;
                     material.CurrentStock -= consumeQty;
+
+                    if (material.CurrentStock <= material.MinimumStock  && material.AlertSent == false)
+                    {
+                        Log.Warning("ALERTA DE ESTOQUE BAIXO: {MaterialCode} - {CurrentStock} - {MinimumStock}", material.MaterialCode, material.CurrentStock, material.MinimumStock);
+
+                        LowStockAlertEvent lowStockAlertEvent = new LowStockAlertEvent();
+
+                        lowStockAlertEvent.MaterialCode = material.MaterialCode;
+                        lowStockAlertEvent.CurrentStock = material.CurrentStock;
+                        lowStockAlertEvent.MinimumStock = material.MinimumStock;
+
+                        // Obs.: Roteando de onde será enviada
+                        string routingKey = "alert.lowstock";
+
+                        _rabbitMQServices.PublishEvent(routingKey, lowStockAlertEvent);
+                        material.AlertSent = true;
+                    }
 
                     dbContext.SaveChanges();
 
