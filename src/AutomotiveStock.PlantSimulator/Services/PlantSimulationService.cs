@@ -1,18 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
 using AutomotiveStock.Shared.Services;
 using Serilog;
 using AutomotiveStock.Shared.Contracts;
 using AutomotiveStock.Shared.Enums;
-
+using System.Threading; // <-- Adicionei este 'using'
 
 namespace AutomotiveStock.PlantSimulator.Services
 {
     public class PlantSimulationService
-    {                
+    {
         private readonly RabbitMQServices _rabbitMQServices;
+
         public PlantSimulationService(RabbitMQServices rabbitMQServices)
         {
             _rabbitMQServices = rabbitMQServices;
@@ -26,35 +23,74 @@ namespace AutomotiveStock.PlantSimulator.Services
                 Log.Information("\n------------------------------------------");
                 Log.Information("Simulando envio do evento #{EventCount}...", eventCount);
 
-                // 3. Criamos um evento de consumo falso, para teste
-                var consumptionEvent = new MaterialConsumptionEvent
+                // A lógica de 'try/catch' e 'routingKey' foi movida para DENTRO
+                // dos blocos 'if' e 'else'
+                
+                if (eventCount % 10 == 0)
                 {
-                    DateTimeConsumption = DateTime.UtcNow,
-                    PlantConsumption = "Planta A",
-                    MaterialCode = "ACO-1020",
-                    QtyConsumed = 150.5,
-                    ProductionOrder = "OP-2025-001",
-                    ConsumedReason = ConsumedReasons.Production
-                };
+                    // --- BLOCO DE REABASTECIMENTO [RF03] ---
 
-                // 4. Definimos a rota
-                var routingKey = "consumption.planta-a";
+                    // 1. Criamos o evento de Reabastecimento
+                    var replenishmentEvent = new MaterialReplenishmentEvent
+                    {
+                        EventId = Guid.NewGuid(), // Boa prática adicionar ID
+                        DateTimeEntry = DateTime.UtcNow,
+                        DestinyPlant = "Planta A",
+                        QtyReceived = 5000,
+                        MaterialCode = "ACO-1020"
+                    };
 
-                // 5. Publicamos
-                try
-                {
-                    _rabbitMQServices.PublishEvent(routingKey, consumptionEvent);
+                    // 2. Definimos o Routing Key CORRETO
+                    var routingKey = "replenishment.planta-a";
 
-                    Log.Information("Evento Publicado: {RoutingKey} | EventId: {EventId}", routingKey, consumptionEvent.EventId);
-                    eventCount++;
+                    // 3. Publicamos
+                    try
+                    {
+                        _rabbitMQServices.PublishEvent(routingKey, replenishmentEvent);
+                        Log.Information("Evento de REABASTECIMENTO Publicado: {RoutingKey} | EventId: {EventId}", 
+                            routingKey, 
+                            replenishmentEvent.EventId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[!] Falha ao conectar/publicar REABASTECIMENTO");
+                    }
                 }
-                catch (Exception ex)
+                else
                 {
-                    Log.Error(ex, "[!] Falha ao conectar/publicar");
+                    // --- BLOCO DE CONSUMO [RF01] ---
+
+                    // 1. Criamos o evento de Consumo
+                    var consumptionEvent = new MaterialConsumptionEvent
+                    {
+                        DateTimeConsumption = DateTime.UtcNow,
+                        PlantConsumption = "Planta A",
+                        MaterialCode = "ACO-1020",
+                        QtyConsumed = 150.5,
+                        ProductionOrder = "OP-2025-001",
+                        ConsumedReason = ConsumedReasons.Production
+                    };
+
+                    // 2. Definimos o Routing Key CORRETO
+                    var routingKey = "consumption.planta-a";
+
+                    // 3. Publicamos
+                    try
+                    {
+                        _rabbitMQServices.PublishEvent(routingKey, consumptionEvent);
+                        Log.Information("Evento de CONSUMO Publicado: {RoutingKey} | EventId: {EventId}", 
+                            routingKey, 
+                            consumptionEvent.EventId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.Error(ex, "[!] Falha ao conectar/publicar CONSUMO");
+                    }
                 }
 
-                // Aguarda 5 segundos para o próximo evento
-                Thread.Sleep(5000);
+                // Incrementamos o contador e esperamos
+                eventCount++;
+                Thread.Sleep(5000); // 5 segundos
             }
         }
     }
