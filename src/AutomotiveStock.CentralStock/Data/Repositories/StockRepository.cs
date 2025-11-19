@@ -143,5 +143,34 @@ namespace AutomotiveStock.CentralStock.Data.Repositories
                 }
             }
         }
+
+        public void UpdateStockFromReplenishment(MaterialReplenishmentEvent materialReplenishmentEvent)
+        {
+            using(var dbContext = new CentralStockDbContext(_dbContext))
+            {
+                var material = dbContext.Materials.FirstOrDefault(m => m.MaterialCode == materialReplenishmentEvent.MaterialCode);
+
+                if (material != null)
+                {
+                    double oldStock = material.CurrentStock;
+                    material.CurrentStock = material.CurrentStock + materialReplenishmentEvent.QtyReceived;
+
+                    material.AlertSent = false;
+
+                    dbContext.SaveChanges();
+                    
+                    Log.Information(
+                        "Estoque atualizado para {MaterialCode}: {oldStock} kg -> {NewStock} kg (+{QtyReceived} kg)",
+                        materialReplenishmentEvent.MaterialCode,
+                        oldStock,
+                        material.CurrentStock,
+                        materialReplenishmentEvent.QtyReceived
+                    );
+                }else
+                {
+                    Log.Warning("Recebido evento de XXX para material não cadastrado: {MaterialCode}", materialReplenishmentEvent.MaterialCode);
+                }
+            }
+        }
     }
 }

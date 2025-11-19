@@ -39,9 +39,9 @@ namespace AutomotiveStock.CentralStock.Consumers
         {
             try
             {
-                var consumptionEvent = JsonSerializer.Deserialize<MaterialConsumptionEvent>(message);
+                
 
-                if(message.Contains("QtyReceived") && message != null){
+                if(message != null && message.Contains("QtyReceived")){
                     var replenishmentEvent = JsonSerializer.Deserialize<MaterialReplenishmentEvent>(message);
 
                     Log.Information(
@@ -52,8 +52,11 @@ namespace AutomotiveStock.CentralStock.Consumers
                     );
 
                     // TODO: Atualizar estoque no banco.
+                    _stockRepository.UpdateStockFromReplenishment(replenishmentEvent);
                 } else
                 {
+                    var consumptionEvent = JsonSerializer.Deserialize<MaterialConsumptionEvent>(message);
+                    
                     if (consumptionEvent != null)
                     {
                         Log.Information(
