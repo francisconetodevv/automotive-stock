@@ -26,10 +26,12 @@ namespace AutomotiveStock.CentralStock.Consumers
             Log.Information("----------------------------------------------");
 
             string queueName = "queue.central.stock"; //
-            string routingKey = "consumption.*";      //
+            string routingKeyConsumption = "consumption.*";      //
+            string routingKeyReplenishment = "replenishment.*";
 
             // 3. Passa o método privado como o "Callback"
-            _rabbitMQServices.StartConsuming(queueName, routingKey, OnMessageReceived);
+            _rabbitMQServices.StartConsuming(queueName, routingKeyConsumption, OnMessageReceived);
+            _rabbitMQServices.StartConsuming(queueName, routingKeyReplenishment, OnMessageReceived);
         }
 
         // 4. Esta é a LÓGICA DE NEGÓCIO (o antigo 'handleConsumptionEvent')
@@ -39,19 +41,33 @@ namespace AutomotiveStock.CentralStock.Consumers
             {
                 var consumptionEvent = JsonSerializer.Deserialize<MaterialConsumptionEvent>(message);
 
-                if (consumptionEvent != null)
-                {
+                if(message.Contains("QtyReceived") && message != null){
+                    var replenishmentEvent = JsonSerializer.Deserialize<MaterialReplenishmentEvent>(message);
+
                     Log.Information(
-                        "Evento Recebido: Planta {Plant} | Material {MaterialCode} | Qty {Quantity}",
-                        consumptionEvent.PlantConsumption,
-                        consumptionEvent.MaterialCode,
-                        consumptionEvent.QtyConsumed
+                        "Evento Recebido: Planta {Plant} | Material {MaterialCode} | Qty {QtyReceived}",
+                        replenishmentEvent.DestinyPlant,
+                        replenishmentEvent.MaterialCode,
+                        replenishmentEvent.QtyReceived
                     );
 
-                    _stockRepository.UpdateStockFromConsumption(
-                        consumptionEvent.MaterialCode, 
-                        consumptionEvent.QtyConsumed
-                    );
+                    // TODO: Atualizar estoque no banco.
+                } else
+                {
+                    if (consumptionEvent != null)
+                    {
+                        Log.Information(
+                            "Evento Recebido: Planta {Plant} | Material {MaterialCode} | Qty {Quantity}",
+                            consumptionEvent.PlantConsumption,
+                            consumptionEvent.MaterialCode,
+                            consumptionEvent.QtyConsumed
+                        );
+
+                        _stockRepository.UpdateStockFromConsumption(
+                            consumptionEvent.MaterialCode, 
+                            consumptionEvent.QtyConsumed
+                        );
+                    }
                 }
             }
             catch (JsonException jsonEx)
