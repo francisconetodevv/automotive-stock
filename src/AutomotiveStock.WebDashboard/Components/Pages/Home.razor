@@ -1,0 +1,102 @@
+﻿@page "/"
+@using AutomotiveStock.CentralStock.Data
+@using AutomotiveStock.CentralStock.Data.Entities
+@using Microsoft.EntityFrameworkCore
+@inject IServiceScopeFactory ScopeFactory
+@implements IDisposable
+@rendermode InteractiveServer
+
+<PageTitle>Dashboard de Estoque</PageTitle>
+
+<div class="container-fluid">
+    <h1 class="mb-4 text-center">🏭 Monitoramento de Estoque - Tempo Real</h1>
+
+    @if (Materials == null)
+    {
+        <p><em>Carregando dados do estoque...</em></p>
+    }
+    else
+    {
+        <div class="row">
+            @foreach (var item in Materials)
+            {
+                <div class="col-md-4 mb-4">
+                    @{
+                        // Lógica Visual: Se estoque atual <= minimo, fica vermelho (danger), senão verde (success)
+                        var cardClass = item.CurrentStock <= item.MinimumStock ? "border-danger" : "border-success";
+                        var headerClass = item.CurrentStock <= item.MinimumStock ? "bg-danger text-white" : "bg-success text-white";
+                        var statusText = item.CurrentStock <= item.MinimumStock ? "⚠️ CRÍTICO" : "✅ NORMAL";
+                    }
+
+                    <div class="card @cardClass shadow-sm h-100">
+                        <div class="card-header @headerClass d-flex justify-content-between align-items-center">
+                            <h5 class="m-0">@item.MaterialCode</h5>
+                            <span class="badge bg-light text-dark">@statusText</span>
+                        </div>
+                        <div class="card-body">
+                            <h6 class="card-title">@item.Name</h6>
+                            <hr />
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <small class="text-muted">Estoque Atual</small>
+                                    <h2 class="fw-bold">@item.CurrentStock.ToString("N0") <small class="fs-6">@item.Unit</small></h2>
+                                </div>
+                                <div class="col-6 border-start">
+                                    <small class="text-muted">Mínimo</small>
+                                    <h4>@item.MinimumStock.ToString("N0")</h4>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <small class="text-muted">Fornecedor: @item.Supplier</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="text-end text-muted">
+            <small>Última atualização: @DateTime.Now.ToString("HH:mm:ss")</small>
+        </div>
+    }
+</div>
+
+@code {
+    private List<Material>? Materials;
+    private PeriodicTimer? _timer;
+    private CancellationTokenSource _cts = new();
+
+    protected override void OnInitialized()
+    {
+        // Inicia o Timer para rodar em background e atualizar a tela
+        _timer = new PeriodicTimer(TimeSpan.FromSeconds(1)); // Atualiza a cada 1 segundo
+        _ = RefreshStockLoop();
+    }
+
+    private async Task RefreshStockLoop()
+    {
+        while (await _timer.WaitForNextTickAsync(_cts.Token))
+        {
+            await LoadData();
+            await InvokeAsync(StateHasChanged); // Avisa o Blazor para redesenhar a tela
+        }
+    }
+
+    private async Task LoadData()
+    {
+        // Criamos um escopo para pegar o DbContext, ler os dados e fechar a conexão rapidamente
+        using (var scope = ScopeFactory.CreateScope())
+        {
+            var dbContext = scope.ServiceProvider.GetRequiredService<CentralStockDbContext>();
+            
+            // Buscamos os materiais ordenados pelo código
+            Materials = await dbContext.Materials.OrderBy(m => m.MaterialCode).ToListAsync();
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _timer?.Dispose();
+    }
+}

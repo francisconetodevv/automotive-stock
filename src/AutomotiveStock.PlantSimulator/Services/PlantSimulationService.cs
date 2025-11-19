@@ -36,7 +36,7 @@ namespace AutomotiveStock.PlantSimulator.Services
                         EventId = Guid.NewGuid(), // Boa prática adicionar ID
                         DateTimeEntry = DateTime.UtcNow,
                         DestinyPlant = "Planta A",
-                        QtyReceived = 5000,
+                        QtyReceived = 50000,
                         MaterialCode = "ACO-1020"
                     };
 
@@ -66,7 +66,7 @@ namespace AutomotiveStock.PlantSimulator.Services
                         DateTimeConsumption = DateTime.UtcNow,
                         PlantConsumption = "Planta A",
                         MaterialCode = "ACO-1020",
-                        QtyConsumed = 150.5,
+                        QtyConsumed = 10000,
                         ProductionOrder = "OP-2025-001",
                         ConsumedReason = ConsumedReasons.Production
                     };
