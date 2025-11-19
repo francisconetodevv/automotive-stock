@@ -31,7 +31,7 @@ namespace AutomotiveStock.CentralStock.Consumers
 
             // 3. Passa o método privado como o "Callback"
             _rabbitMQServices.StartConsuming(queueName, routingKeyConsumption, OnMessageReceived);
-            _rabbitMQServices.StartConsuming(queueName, routingKeyReplenishment, OnMessageReceived);
+            _rabbitMQServices.BindQueue(queueName, routingKeyReplenishment);
         }
 
         // 4. Esta é a LÓGICA DE NEGÓCIO (o antigo 'handleConsumptionEvent')

@@ -170,15 +170,14 @@ Please refer to the project wiki.
 4. Push to the branch
 5. Create a Pull Request
 
-## 📄 License
 
-This project is proprietary software of Automotive Manufacturing Corp.
-
----
 
 ## 📞 Support
 
 For support and queries, please contact the development team.
 
 ---
+
 Generated: October 29, 2025
+
+© 2025 Automotive Manufacturing Corp. All rights reserved.

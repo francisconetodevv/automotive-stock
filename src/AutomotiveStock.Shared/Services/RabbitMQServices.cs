@@ -92,12 +92,28 @@ namespace AutomotiveStock.Shared.Services
             // 7. Inciamos o consumo
             _consumerChannel.BasicConsume(queue: queueName, autoAck: false, consumer: consumer);
         }
-        
+
         // 8. Fecha a conexão e o canal do consumidor
         public void DisposeConsumer()
         {
             _consumerChannel?.Dispose();
             _consumerConnection?.Dispose();
+        }
+
+        public void BindQueue(string queueName, string routingKey)
+        {
+            if (_consumerChannel != null && _consumerChannel.IsOpen)
+            {
+                _consumerChannel.QueueBind(queue: queueName,
+                                            exchange: _exchangeName,
+                                            routingKey: routingKey);
+
+                Console.WriteLine($" [x] Nova Rota Vinculada: '{routingKey}' na fila '{queueName}'");
+            }
+            else
+            {
+                Console.WriteLine(" [!] Erro: O canal não está aberto. Chame StartConsuming primeiro.");
+            }
         }
     }
 }
